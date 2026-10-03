@@ -40,7 +40,7 @@ import AppKit
     private let autoMic = "automaticMicrophone"
 
     init() {
-        keyConfigured = Keychain.load() != nil
+        keyConfigured = Keychain.exists()
         let saved = UInt32(UserDefaults.standard.integer(forKey: "microphoneDevice"))
         microphoneID = microphones.first(where: { $0.id == saved })?.id
             ?? microphones.first(where: { $0.builtIn })?.id ?? 0
@@ -91,7 +91,15 @@ import AppKit
         guard keyConfigured else { settingsVisible = true; return }
         guard !restoring else { return }
         restoring = true; defer { restoring = false }
-        let allowed = await AVCaptureDevice.requestAccess(for: .audio)
+        // Do not issue another asynchronous permission request when macOS has
+        // already authorized this app. Device setup is separate from permission.
+        let authorization = AVCaptureDevice.authorizationStatus(for: .audio)
+        let allowed: Bool
+        if authorization == .authorized { allowed = true }
+        else if authorization == .notDetermined {
+            message = "Allow microphone access in the macOS prompt…"
+            allowed = await AVCaptureDevice.requestAccess(for: .audio)
+        } else { allowed = false }
         guard allowed else {
             error = "Allow microphone access for Odd Retro Muse in System Settings → Privacy & Security → Microphone."
             return
@@ -211,7 +219,9 @@ import AppKit
                 if self.generation == gen { self.audioURL = nil; self.state = "ready"; self.feedback("ready") }
             }
             do {
-                guard let key = Keychain.load() else { throw AppError("Add your OpenAI API key in Settings.") }
+                let loaded = await Task.detached { Keychain.load() }.value
+                guard self.generation == gen, !Task.isCancelled else { return }
+                guard let key = loaded else { throw AppError("Allow the app to use your saved OpenAI key, or add a key in Settings.") }
                 let text = try await Transcription.transcribe(Data(contentsOf: url), key: key)
                 guard self.generation == gen, !Task.isCancelled else { return }
                 self.draft = text
