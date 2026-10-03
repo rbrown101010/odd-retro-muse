@@ -1,0 +1,6 @@
+Odd Retro Muse contains a modified Muse Gadgets SDK.
+Muse Gadgets SDK: Copyright (c) Meta Platforms, Inc. and affiliates.
+Licensed under Apache License 2.0; original notices remain in source files.
+Upstream: https://github.com/facebookincubator/muse-gadget-sdk
+Chromatic hardware protocol references: https://github.com/ModRetro/oss-chromatic-console-mcu
+This is an independent project, not an official ModRetro or Muse product.

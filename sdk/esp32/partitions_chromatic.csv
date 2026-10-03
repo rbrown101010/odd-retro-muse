@@ -1,0 +1,8 @@
+# Custom Chromatic-only 4MB layout. Upstream production layouts are unchanged.
+# Keep SDK pre-app and ota_0 offsets, omit OTA slot 1 and manufacturing data.
+# This is a full USB reflash boundary; OTA is disabled. Stock flash is backed up.
+# Name, Type, SubType, Offset, Size, Flags
+nvs,data,nvs,0x11000,0x6000,
+otadata,data,ota,0x17000,0x2000,
+phy_init,data,phy,0x19000,0x1000,
+ota_0,app,ota_0,0x20000,0x3E0000,
