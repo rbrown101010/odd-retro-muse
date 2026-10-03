@@ -16,7 +16,7 @@ def main():
     app=args.output.resolve();contents=app/'Contents';binary=contents/'MacOS/OddRetroMuse'
     binary.parent.mkdir(parents=True,exist_ok=True);(contents/'Resources').mkdir(exist_ok=True)
     sdk=subprocess.check_output(['xcrun','--sdk','macosx','--show-sdk-path'],text=True).strip()
-    sources=[str(root/'macos'/name) for name in ('App.swift','Bridge.swift','Controller.swift','Keychain.swift','Transcription.swift')]
+    sources=[str(root/'macos'/name) for name in ('App.swift','Bridge.swift','Controller.swift','MicrophoneRecorder.swift','Keychain.swift','Transcription.swift')]
     subprocess.run(['xcrun','swiftc','-swift-version','5','-parse-as-library','-O','-sdk',sdk,
                     '-target',args.arch+'-apple-macosx14.0',*sources,'-o',str(binary)],check=True)
     info={'CFBundleExecutable':'OddRetroMuse','CFBundleIdentifier':'com.riley.odd-retro-muse',

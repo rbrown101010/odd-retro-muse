@@ -11,7 +11,7 @@ The compact 160 × 144 interface keeps the little Muse character and gives repli
 Open **Odd Retro Muse.app** in your user Applications folder. It starts at login and stays in the menu bar when its window is closed. No terminal or browser is needed for everyday use.
 
 1. Open Settings and enter your own OpenAI API key. The app stores it in macOS Keychain.
-2. Click **Enable microphone** and allow Mac microphone access once.
+2. Click **Enable microphone** and allow Mac microphone access once. The app selects the built-in Mac microphone by default; use the microphone menu to choose another input.
 3. Press **A+B together** on the Chromatic to start recording.
 4. Press **A+B together again** to stop, transcribe with OpenAI, and send the text to Muse.
 5. Press **B alone** while recording or transcribing to cancel. Once a question has been sent, it cannot be unsent.
@@ -38,7 +38,7 @@ For a computer that already has a wireless configuration installed, update using
 .venv/bin/python install_companion.py
 ```
 
-The app uses OpenAI's `gpt-transcribe` file transcription API. Audio is recorded as mono AAC, uploaded only after stop-and-send, and deleted locally when transcription finishes or fails. Cancellation aborts an active upload and prevents forwarding its result to Muse; audio already transmitted cannot be recalled. A two-minute recording limit cancels rather than sending an incomplete question. Transcripts above the handheld's 1,023-byte input limit remain in the app for editing.
+The app uses OpenAI's `gpt-transcribe` file transcription API. Audio is recorded as PCM WAV at the selected microphone’s native sample rate, uploaded only after stop-and-send, and deleted locally when transcription finishes or fails. Cancellation aborts an active upload and prevents forwarding its result to Muse; audio already transmitted cannot be recalled. A two-minute recording limit cancels rather than sending an incomplete question. Transcripts above the handheld's 1,023-byte input limit remain in the app for editing.
 
 OpenAI API billing is separate from ChatGPT subscriptions. Configure a valid API key with access and credit in the app's Settings. Keys do not pass through the local HTTP bridge, go onto the handheld, or enter this repository. Audio is sent to OpenAI and the transcript is sent to your Muse. Refer to [OpenAI's transcription documentation](https://developers.openai.com/api/docs/guides/speech-to-text) for service details.
 
@@ -106,7 +106,7 @@ Restore stock only using the exact full backup made from that device. A full res
 
 ## Source map and validation
 
-- `macos/`: native SwiftUI app, AVAudioRecorder, Keychain, OpenAI multipart transcription, and background button handling.
+- `macos/`: native SwiftUI app, AVAudioEngine, microphone selection, Keychain, OpenAI multipart transcription, and background button handling.
 - `companion.py`, `wireless_client.py`: loopback HTTP and authenticated Wi-Fi bridge.
 - `sdk/esp32/main/chromatic_*.c`: compact character renderer, stock FPGA QSPI display, button chords, Muse turns, and local wireless transport.
 - `sdk/esp32/devices/sdkconfig.chromatic`: board and development security profile.

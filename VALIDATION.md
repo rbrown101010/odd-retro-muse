@@ -11,7 +11,7 @@ Checked on an Apple Silicon Mac and one ESP32-U4WDH Chromatic on October 3, 2026
 - Native Swift transcription tests passed for binary multipart preservation, successful returned text, API authentication/rate/server failures, empty audio/text, and cancelled uploads.
 - Native app signature verified after installation. The installed bridge and native app launcher are registered as macOS login agents. A full Mac logout/reboot was not performed during this update.
 
-A live OpenAI recording → transcription → Muse test still requires the user's valid OpenAI API key in the native app's Settings. The API key available during development was rejected with HTTP 401. Mock tests verify request/error/cancellation handling, not live transcription quality. The earlier browser microphone workflow was tested on hardware; this update replaces that workflow in the installed native app.
+A live OpenAI recording → transcription → Muse round trip is now verified. The original AAC recorder failed to start on the active Bluetooth input. The replacement AVAudioEngine path used the built-in Mac microphone, captured WAV audio, returned a 204-byte transcript, and received a 193-byte Muse reply. No audio or private conversation content is included here.
 
 ## Reproduce focused tests
 

@@ -24,7 +24,10 @@ import AppKit
     private var cursor = 0
     private var service = ""
     private var generation = 0
-    private var recorder: AVAudioRecorder?
+    private var recorder: MicrophoneRecorder?
+    @Published var microphones = MicrophoneDevice.available()
+    @Published var microphoneID: UInt32 = 0
+    private var recordingStarted = Date.distantPast
     private var audioURL: URL?
     private var polling: Task<Void, Never>?
     private var processing: Task<Void, Never>?
@@ -38,11 +41,14 @@ import AppKit
 
     init() {
         keyConfigured = Keychain.load() != nil
+        let saved = UInt32(UserDefaults.standard.integer(forKey: "microphoneDevice"))
+        microphoneID = microphones.first(where: { $0.id == saved })?.id
+            ?? microphones.first(where: { $0.builtIn })?.id ?? 0
         // Clear only stale recordings created by this app after an unexpected exit.
         let directory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("Chromatic Muse/Recordings")
         for file in (try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)) ?? [] {
-            if file.pathExtension == "m4a", UUID(uuidString: file.deletingPathExtension().lastPathComponent) != nil {
+            if ["m4a", "wav"].contains(file.pathExtension), UUID(uuidString: file.deletingPathExtension().lastPathComponent) != nil {
                 try? FileManager.default.removeItem(at: file)
             }
         }
@@ -148,6 +154,12 @@ import AppKit
             message = "Reconnecting the background companion…"
         }
     }
+    func selectMicrophone(_ id: UInt32) {
+        guard state == "ready" else { return }
+        microphoneID = id
+        UserDefaults.standard.set(Int(id), forKey: "microphoneDevice")
+        error = ""
+    }
     func toggleRecording() {
         if state == "ready" { startRecording() }
         else if state == "listening" { stopRecording() }
@@ -160,16 +172,13 @@ import AppKit
                 .appendingPathComponent("Chromatic Muse/Recordings", isDirectory: true)
             try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true,
                 attributes: [.posixPermissions: 0o700])
-            let url = folder.appendingPathComponent(UUID().uuidString + ".m4a")
+            let url = folder.appendingPathComponent(UUID().uuidString + ".wav")
             audioURL = url
-            let r = try AVAudioRecorder(url: url, settings: [AVFormatIDKey: kAudioFormatMPEG4AAC,
-                AVSampleRateKey: 16000, AVNumberOfChannelsKey: 1, AVEncoderBitRateKey: 64000,
-                AVEncoderAudioQualityKey: AVAudioQuality.high.rawValue])
-            r.isMeteringEnabled = true
+            let r = MicrophoneRecorder()
             recorder = r
-            guard r.prepareToRecord(), r.record() else { throw AppError("Could not start the Mac microphone.") }
+            try r.start(url: url, device: microphoneID)
             try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
-            recorder = r; audioURL = url; state = "listening"
+            recordingStarted = Date(); state = "listening"
             message = "Listening. Speak near your Mac. Press A+B again to stop and send."
             feedback("listening")
             meter = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
@@ -179,8 +188,12 @@ import AppKit
     }
     private func updateMeter() {
         guard let r = recorder, state == "listening" else { return }
-        r.updateMeters(); elapsed = r.currentTime; peak = max(peak, r.peakPower(forChannel: 0))
-        level = max(0, min(1, pow(10, r.averagePower(forChannel: 0) / 30)))
+        let metrics = r.metrics()
+        elapsed = metrics.elapsed; peak = metrics.peak; level = metrics.level
+        if let failure = metrics.failure { cancelRecording(); error = failure; return }
+        if elapsed == 0 && Date().timeIntervalSince(recordingStarted) > 4 {
+            cancelRecording(); error = "No audio is arriving from this microphone. Choose another input and try again."; return
+        }
         if elapsed >= 120 { cancelRecording(); error = "Two-minute recording limit reached. Start a new question." }
     }
     private func stopRecording() {

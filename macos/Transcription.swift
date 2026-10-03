@@ -9,7 +9,7 @@ struct Transcription {
             ("prompt", "Vocabulary: Muse, ModRetro, Chromatic, Odd Retro Muse, GitHub, OpenAI.")] {
             append("--\(boundary)\r\nContent-Disposition: form-data; name=\"\(name)\"\r\n\r\n\(value)\r\n")
         }
-        append("--\(boundary)\r\nContent-Disposition: form-data; name=\"file\"; filename=\"question.m4a\"\r\nContent-Type: audio/mp4\r\n\r\n")
+        append("--\(boundary)\r\nContent-Disposition: form-data; name=\"file\"; filename=\"question.wav\"\r\nContent-Type: audio/wav\r\n\r\n")
         data.append(audio)
         append("\r\n--\(boundary)--\r\n")
         return data

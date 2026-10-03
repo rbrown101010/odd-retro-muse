@@ -94,6 +94,13 @@ struct CompanionView: View {
                             .font(.system(.caption, design: .monospaced)).frame(width: 48)
                     }
                 }
+                HStack {
+                    Text("Microphone").font(.caption).foregroundStyle(.secondary)
+                    Picker("Microphone", selection: Binding(get: { controller.microphoneID }, set: { controller.selectMicrophone($0) })) {
+                        Text("System default").tag(UInt32(0))
+                        ForEach(controller.microphones) { device in Text(device.name).tag(device.id) }
+                    }.labelsHidden().disabled(controller.state != "ready")
+                }
                 Text(controller.message).font(.subheadline).foregroundStyle(.secondary).textSelection(.enabled)
                 if !controller.error.isEmpty {
                     Text(controller.error).font(.subheadline).foregroundStyle(.orange).textSelection(.enabled)
