@@ -115,3 +115,5 @@ Restore stock only using the exact full backup made from that device. A full res
 See [VALIDATION.md](VALIDATION.md) for what was actually checked and the remaining credential-dependent voice test.
 
 Based on Meta's [Muse Gadgets SDK](https://github.com/facebookincubator/muse-gadget-sdk) and protocol references from ModRetro's [MCU source](https://github.com/ModRetro/oss-chromatic-console-mcu). Original source notices and Apache 2.0 licensing are preserved. This is an independent project.
+
+Read [SECURITY.md](SECURITY.md) for credential handling, the public SDK development key, and the development firmware's physical-security limitations.

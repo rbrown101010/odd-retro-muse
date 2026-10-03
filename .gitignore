@@ -20,3 +20,12 @@ wireless.json
 *token*.txt
 .env
 .env.*
+*.pem
+*.key
+*.p12
+*.pfx
+*.keystore
+*.mobileprovision
+.secrets/
+# Intentionally public upstream development fixture, never a release key.
+!sdk/esp32/dev_signing_key.pem
