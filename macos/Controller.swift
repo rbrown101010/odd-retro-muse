@@ -113,8 +113,13 @@ import AppKit
                 service = status.service_session; cursor = 0
                 if armed { cancelRecording(); armed = false }
             }
+            let wasConnected = connected
             connected = status.muse_connected && status.device_connected
             wireless = status.wireless; museBusy = status.busy ?? museBusy
+            if connected && !wasConnected && state == "ready" && !museBusy {
+                message = armed ? "Ready. A+B starts recording; A+B again sends. B cancels."
+                    : "Connected. Type a question or enable the Mac microphone to use A+B."
+            }
             if !connected && armed { cancelRecording(); armed = false }
             if armed && Date().timeIntervalSince(lastHeartbeat) > 10 {
                 _ = try await voice("heartbeat"); lastHeartbeat = Date()
