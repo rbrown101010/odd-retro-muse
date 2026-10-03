@@ -92,7 +92,15 @@ import AppKit
         guard keyConfigured else { settingsVisible = true; return }
         guard !restoring else { return }
         restoring = true; defer { restoring = false }
-        let allowed = await AVCaptureDevice.requestAccess(for: .audio)
+        // Do not issue another asynchronous permission request when macOS has
+        // already authorized this app. Device setup is separate from permission.
+        let authorization = AVCaptureDevice.authorizationStatus(for: .audio)
+        let allowed: Bool
+        if authorization == .authorized { allowed = true }
+        else if authorization == .notDetermined {
+            message = "Allow microphone access in the macOS prompt…"
+            allowed = await AVCaptureDevice.requestAccess(for: .audio)
+        } else { allowed = false }
         guard allowed else {
             error = "Allow microphone access for Odd Retro Muse in System Settings → Privacy & Security → Microphone."
             return

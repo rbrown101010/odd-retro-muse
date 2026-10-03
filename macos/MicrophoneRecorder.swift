@@ -34,10 +34,11 @@ struct MicrophoneDevice: Identifiable, Hashable {
     }
 }
 
-/// Capture the selected physical input at its actual format. WAV avoids AAC
-/// encoder preparation failures when Bluetooth changes the system input format.
-final class MicrophoneRecorder {
-    private let engine = AVAudioEngine()
+/// Capture the chosen microphone independently of the system playback route.
+/// Virtual output devices must not prevent a physical microphone recording.
+final class MicrophoneRecorder: NSObject, AVCaptureAudioDataOutputSampleBufferDelegate {
+    private let session = AVCaptureSession()
+    private let captureQueue = DispatchQueue(label: "OddRetroMuse.microphone")
     private let lock = NSLock()
     private var file: AVAudioFile?
     private var frames: AVAudioFramePosition = 0
@@ -45,45 +46,80 @@ final class MicrophoneRecorder {
     private var average: Float = -160
     private var peak: Float = -160
     private var failure: String?
-    private var tapped = false
+    private var runtimeObserver: NSObjectProtocol?
 
     func start(url: URL, device: AudioDeviceID) throws {
-        let input = engine.inputNode
-        if device != 0, let unit = input.audioUnit {
-            var id = device
-            let code = AudioUnitSetProperty(unit, kAudioOutputUnitProperty_CurrentDevice,
-                kAudioUnitScope_Global, 0, &id, UInt32(MemoryLayout<AudioDeviceID>.size))
-            guard code == noErr else { throw AppError("Could not open the selected microphone (audio error \(code)). Choose another input.") }
+        let selected: AVCaptureDevice?
+        if device == 0 { selected = AVCaptureDevice.default(for: .audio) }
+        else {
+            var address = AudioObjectPropertyAddress(mSelector: kAudioDevicePropertyDeviceUID,
+                mScope: kAudioObjectPropertyScopeGlobal, mElement: kAudioObjectPropertyElementMain)
+            var uid: Unmanaged<CFString>?
+            var bytes = UInt32(MemoryLayout<Unmanaged<CFString>?>.size)
+            guard AudioObjectGetPropertyData(device, &address, 0, nil, &bytes, &uid) == noErr,
+                  let uid = uid?.takeRetainedValue() else {
+                throw AppError("This microphone disconnected. Select an available input.")
+            }
+            selected = AVCaptureDevice(uniqueID: uid as String)
         }
-        let format = input.outputFormat(forBus: 0)
-        guard format.sampleRate > 0, format.channelCount > 0, format.channelCount <= 2 else {
-            throw AppError("This microphone has no usable audio input. Select your Mac microphone.")
+        guard let selected = selected else { throw AppError("The selected microphone is unavailable. Select another input.") }
+        guard let physical = CMAudioFormatDescriptionGetStreamBasicDescription(selected.activeFormat.formatDescription),
+              physical.pointee.mSampleRate > 0 else {
+            throw AppError("This microphone has no active audio format. Reconnect it or select another input.")
         }
-        sampleRate = format.sampleRate
+        sampleRate = physical.pointee.mSampleRate
+        let input = try AVCaptureDeviceInput(device: selected)
+        let output = AVCaptureAudioDataOutput()
+        output.audioSettings = [AVFormatIDKey: kAudioFormatLinearPCM,
+            AVSampleRateKey: sampleRate, AVNumberOfChannelsKey: 1,
+            AVLinearPCMBitDepthKey: 32, AVLinearPCMIsFloatKey: true,
+            AVLinearPCMIsBigEndianKey: false, AVLinearPCMIsNonInterleaved: true]
+        output.setSampleBufferDelegate(self, queue: captureQueue)
+        session.beginConfiguration()
+        guard session.canAddInput(input), session.canAddOutput(output) else {
+            session.commitConfiguration()
+            throw AppError("Could not connect the selected microphone to the recorder.")
+        }
+        session.addInput(input); session.addOutput(output)
+        session.commitConfiguration()
         file = try AVAudioFile(forWriting: url, settings: [
-            AVFormatIDKey: kAudioFormatLinearPCM, AVSampleRateKey: format.sampleRate,
-            AVNumberOfChannelsKey: format.channelCount, AVLinearPCMBitDepthKey: 16,
+            AVFormatIDKey: kAudioFormatLinearPCM, AVSampleRateKey: sampleRate,
+            AVNumberOfChannelsKey: 1, AVLinearPCMBitDepthKey: 16,
             AVLinearPCMIsFloatKey: false, AVLinearPCMIsBigEndianKey: false,
             AVLinearPCMIsNonInterleaved: false], commonFormat: .pcmFormatFloat32, interleaved: false)
-        input.installTap(onBus: 0, bufferSize: 1024, format: format) { [weak self] buffer, _ in
-            self?.consume(buffer)
+        runtimeObserver = NotificationCenter.default.addObserver(forName: .AVCaptureSessionRuntimeError,
+            object: session, queue: nil) { [weak self] notification in
+            guard let self = self else { return }
+            let code = (notification.userInfo?[AVCaptureSessionErrorKey] as? NSError)?.code ?? 0
+            self.lock.lock(); self.failure = "Microphone capture stopped (audio error \(code)). Reconnect it and try again."; self.lock.unlock()
         }
-        tapped = true
-        do { engine.prepare(); try engine.start() }
-        catch { stop(); throw AppError("Could not start the selected microphone: \(error.localizedDescription)") }
+        session.startRunning()
+        guard session.isRunning else { stop(); throw AppError("Could not start microphone capture. Choose another input and try again.") }
     }
-    private func consume(_ buffer: AVAudioPCMBuffer) {
+    func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
         lock.lock(); defer { lock.unlock() }
-        guard let file = file, failure == nil else { return }
+        guard let file = file, failure == nil, CMSampleBufferDataIsReady(sampleBuffer),
+              let description = CMSampleBufferGetFormatDescription(sampleBuffer) else { return }
+        let format = AVAudioFormat(cmAudioFormatDescription: description)
+        let count = CMSampleBufferGetNumSamples(sampleBuffer)
+        guard count > 0, count <= Int(Int32.max), format.commonFormat == .pcmFormatFloat32,
+              format.channelCount == 1, format.sampleRate == sampleRate,
+              let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(count)) else {
+            failure = "The microphone returned an unsupported recording format. Select another input."; return
+        }
+        buffer.frameLength = AVAudioFrameCount(count)
+        let code = CMSampleBufferCopyPCMDataIntoAudioBufferList(sampleBuffer, at: 0,
+            frameCount: Int32(count), into: buffer.mutableAudioBufferList)
+        guard code == noErr else { failure = "Could not read microphone audio (error \(code))."; return }
         do { try file.write(from: buffer) }
         catch { failure = "Microphone recording failed: \(error.localizedDescription)"; return }
-        frames += AVAudioFramePosition(buffer.frameLength)
-        if let samples = buffer.floatChannelData, buffer.frameLength > 0 {
+        frames += AVAudioFramePosition(count)
+        if let samples = buffer.floatChannelData {
             var sum: Float = 0, maximum: Float = 0
-            for i in 0..<Int(buffer.frameLength) {
+            for i in 0..<count {
                 let value = abs(samples[0][i]); maximum = max(maximum, value); sum += value * value
             }
-            average = 20 * log10(max(0.00000001, sqrt(sum / Float(buffer.frameLength))))
+            average = 20 * log10(max(0.00000001, sqrt(sum / Float(count))))
             peak = max(peak, 20 * log10(max(0.00000001, maximum)))
         }
     }
@@ -92,9 +128,10 @@ final class MicrophoneRecorder {
         return (Double(frames) / sampleRate, max(0, min(1, pow(10, average / 30))), peak, failure)
     }
     func stop() {
-        engine.stop()
-        if tapped { engine.inputNode.removeTap(onBus: 0); tapped = false }
+        session.stopRunning()
+        captureQueue.sync {} // Finish pending writes before the WAV is read/deleted.
         lock.lock(); file = nil; lock.unlock()
+        if let observer = runtimeObserver { NotificationCenter.default.removeObserver(observer); runtimeObserver = nil }
     }
     deinit { stop() }
 }

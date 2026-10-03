@@ -13,6 +13,12 @@ Checked on an Apple Silicon Mac and one ESP32-U4WDH Chromatic on October 3, 2026
 
 A live OpenAI recording → transcription → Muse round trip is now verified. The original AAC recorder failed to start on the active Bluetooth input. The replacement AVAudioEngine path used the built-in Mac microphone, captured WAV audio, returned a 204-byte transcript, and received a 193-byte Muse reply. No audio or private conversation content is included here.
 
+## Subsequent microphone update
+
+The earlier AVAudioEngine path later reported a zero-channel output format for the already-selected Mac microphone. Using its valid hardware input format passed that check but the engine still failed to initialize with error -10875. The current recorder uses a microphone-only AVCaptureSession, selects the exact Core Audio device UID, and requests mono floating-point PCM at the microphone's native sample rate before writing 16-bit WAV. It has no playback connection. Existing microphone authorization is used directly; first-time access still requires the macOS prompt.
+
+The updated native app builds and its installed signature verifies. A synthetic 48 kHz PCM sample-buffer → WAV → decoded-sample round trip passed, as did native transcription tests and all 20 bridge/wireless tests. The update is installed on the test Mac; live capture with this version is pending macOS microphone permission. The earlier successful live voice test above applies to the previous recorder, not this new capture backend.
+
 ## Reproduce focused tests
 
 ```sh
