@@ -17,7 +17,9 @@ PATTERNS = {
 DEVELOPMENT_KEY = "e57311281ea0478a80be57036768ef71481804eab73182b2b70255311a2ded6a"
 PRIVATE_PATH = re.compile(
     r"(^|/)(?:\.env(?:\..*)?|wireless\.json|sdkconfig(?:\.old)?|muse-sdk-token\.txt)$"
-    r"|\.(?:wav|m4a|mp3|bin|elf|p12|pfx|log)$"
+    r"|(^|/)(?:work|dist|build|managed_components|\.venv|\.secrets|__pycache__)(/|$)"
+    r"|\.(?:wav|m4a|mp3|bin|elf|pem|key|p12|pfx|keystore|mobileprovision|log|pyc)$"
+    r"|\.app(/|$)"
 )
 
 
@@ -37,6 +39,13 @@ def main():
     rows = git("rev-list", "--objects", "--all").decode().splitlines()
     findings = set()
     count = 0
+    # One blob may occur under several names. Inspect every historical tree so
+    # a private artifact cannot hide by sharing content with an allowed file.
+    for commit in git("rev-list", "--all").decode().splitlines():
+        paths = git("ls-tree", "-r", "-z", "--name-only", commit).decode(errors="replace").split("\0")
+        for path in paths:
+            if path != "sdk/esp32/dev_signing_key.pem" and PRIVATE_PATH.search(path):
+                findings.add((path, "private artifact"))
     # Batch reads avoid spawning a Git process for each revision of each file.
     process = subprocess.Popen(["git", "cat-file", "--batch"],
                                stdin=subprocess.PIPE, stdout=subprocess.PIPE)
@@ -52,8 +61,6 @@ def main():
                 continue
             count += 1
             label = path or "commit " + oid[:12]
-            if path and PRIVATE_PATH.search(path):
-                findings.add((label, "private artifact"))
             for rule, pattern in PATTERNS.items():
                 for match in re.finditer(pattern, data):
                     if not allowed(path, rule, match.group(), data):
