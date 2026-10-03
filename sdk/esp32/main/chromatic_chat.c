@@ -84,7 +84,7 @@ static cJSON *result(cJSON *j) {
 static const char *field(cJSON *j,const char *key) {
     const char *s=cJSON_GetStringValue(cJSON_GetObjectItem(j,key)); return s?s:"";
 }
-bool chromatic_deliver_message(const char *s,const char *turn_id) {
+bool chromatic_deliver_message(const char *s,const char *turn_id,const chromatic_suggestions_t *choices) {
     if(!rx_lock || !s || !*s || strlen(s)>CHROMATIC_REPLY_BYTES) return false;
     xSemaphoreTake(rx_lock,portMAX_DELAY);
     bool reply=active_turn[0]!=0;
@@ -92,7 +92,9 @@ bool chromatic_deliver_message(const char *s,const char *turn_id) {
     if(valid && reply) reply_received=true;
     xSemaphoreGive(rx_lock);
     if(!valid) return false;
-    chromatic_message(s); emit(reply?"reply":"push",s);
+    chromatic_reply(s,choices); emit(reply?"reply":"push",s);
+    char *options=chromatic_suggestions_json(choices);
+    if(options) { emit("suggestions",options); free(options); }
     return true;
 }
 static void worker(void *arg) {
@@ -104,8 +106,8 @@ static void worker(void *arg) {
         strlcpy(active_turn,turn,sizeof(active_turn)); reply_received=false;
         xSemaphoreGive(rx_lock);
         chromatic_message("Sending to Muse..."); emit("busy","Muse is thinking");
-        char message[1700];
-        snprintf(message,sizeof(message),"%s\n\n[From the Chromatic handheld. Deliver your reply to this device using its display.message command, with text in plain ASCII up to 2400 bytes; give a complete useful answer, concise when appropriate and turn_id exactly %s. Reply via the device command so the user can read it on the handheld.]",ask.text,turn);
+        char message[2200];
+        snprintf(message,sizeof(message),"%s\n\n[From the Chromatic handheld. Use this device's display.reply tool for every answer. Provide text in plain ASCII up to 2400 bytes plus suggestions: a JSON-encoded array string of exactly 20 distinct, contextual follow-up questions or useful actions the user can select. Each option must be plain ASCII, 1 to 44 characters, phrased as the user's next request. Vary the options and make them useful for this specific reply. Give a complete answer, concise when appropriate, and turn_id exactly %s. Deliver both answer and options through display.reply so they appear on the handheld.]",ask.text,turn);
         cJSON *body=cJSON_CreateObject(); cJSON_AddStringToObject(body,"message",message);
         cJSON_AddStringToObject(body,"device_id",identity_node_id());
         char *json=cJSON_PrintUnformatted(body); cJSON_Delete(body);

@@ -71,7 +71,7 @@ set(GADGET_REQUIRES
 
 # E-paper has its own status screen in place of led_status.c.
 if(CONFIG_HOMEHUB_CHROMATIC)
-    list(APPEND GADGET_SRCS "chromatic_hw.c" "chromatic_ui.c" "chromatic_chat.c" "chromatic_wireless.c")
+    list(APPEND GADGET_SRCS "chromatic_hw.c" "chromatic_ui.c" "chromatic_chat.c" "chromatic_wireless.c" "chromatic_suggestions.c")
 elseif(CONFIG_HOMEHUB_LED_BACKEND_RETERMINAL_UC8179)
     list(APPEND GADGET_SRCS "epaper_status.c")
 else()

@@ -4,3 +4,4 @@ Licensed under Apache License 2.0; original notices remain in source files.
 Upstream: https://github.com/facebookincubator/muse-gadget-sdk
 Chromatic hardware protocol references: https://github.com/ModRetro/oss-chromatic-console-mcu
 This is an independent project, not an official ModRetro or Muse product.
+Some upstream files carry separate notices: pixel_font.c is BSD-2-Clause, minimp3 is CC0, and upstream avatar files retain their original Meta copyright notices. The top-level Apache license does not replace those notices.

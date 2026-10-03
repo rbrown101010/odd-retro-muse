@@ -47,7 +47,14 @@ void chromatic_bind_pairing(chromatic_button_cb tap, chromatic_button_cb twice,
 void chromatic_message(const char *s) {
     if(!lock) return;
     xSemaphoreTake(lock,portMAX_DELAY);
-    strlcpy(view.message,s?s:"",sizeof(view.message)); view.page=0;
+    strlcpy(view.message,s?s:"",sizeof(view.message)); view.page=0; view.choices.count=0; view.choice_selected=0;
+    xSemaphoreGive(lock);
+}
+void chromatic_reply(const char *s,const chromatic_suggestions_t *choices) {
+    if(!lock) return;
+    xSemaphoreTake(lock,portMAX_DELAY);
+    strlcpy(view.message,s,sizeof(view.message)); view.page=0; view.choice_selected=0;
+    view.choices=*choices;
     xSemaphoreGive(lock);
 }
 void chromatic_set_voice(const char *state) {
@@ -62,7 +69,7 @@ void chromatic_set_voice(const char *state) {
     if(view.listening) strlcpy(view.message,"Speak near your computer's microphone. Press A+B again to send. B cancels.",sizeof(view.message));
     else if(!strcmp(state,"stopping")) strlcpy(view.message,"Finishing your transcript...",sizeof(view.message));
     else if(voice_active && !active && !busy) view.message[0]=0;
-    if(active) view.page=0;
+    if(active) { view.page=0; view.choices.count=0; }
     voice_active=active;
     xSemaphoreGive(lock);
 }
@@ -79,25 +86,40 @@ static void on_buttons(uint16_t b) {
         }
     }
     if(action&CH_BUTTON_A) {
-        int state, selection;
+        int state, selection; char choice[CHROMATIC_CHOICE_BYTES+1]={0}; bool open_choices=false;
         xSemaphoreTake(lock,portMAX_DELAY); state=view.state; selection=view.selected; bool listening=view.listening;
+        if(!listening && !chromatic_chat_busy() && view.message[0] && view.choices.count==CHROMATIC_CHOICE_COUNT) {
+            int pages=chromatic_message_pages(view.message);
+            if(view.page<pages) { view.page=pages; open_choices=true; }
+            else strcpy(choice,view.choices.items[view.choice_selected]);
+        }
         xSemaphoreGive(lock);
         if(!listening) {
             if(state==LED_STATE_PAIRING_CONFIRM_REQUIRED || state==LED_STATE_BLE_CONNECTED || state==LED_STATE_BLE_ADVERTISING) {
                 if(on_tap) on_tap();
-            } else if(noise_ctrl_is_connected()) chromatic_ask(prompts[selection]);
+            } else if(open_choices) { /* A opens the options beneath this reply. */ }
+            else if(noise_ctrl_is_connected()) chromatic_ask(choice[0]?choice:prompts[selection]);
             else chromatic_message("Pair in the Muse phone app first. Settings > Devices > Developer mode.");
         }
     }
     if(action&CH_BUTTON_B) chromatic_emit("voice_cancel","B");
     xSemaphoreTake(lock,portMAX_DELAY);
-    if(action&CH_BUTTON_B) { view.message[0]=0; view.page=0; }
+    if(action&CH_BUTTON_B) { view.message[0]=0; view.page=0; view.choices.count=0; }
     if(rising & ((1<<4)|(1<<6))) {
-        if(view.message[0]) { if(view.page>0) view.page--; }
+        if(view.message[0]) {
+            int pages=chromatic_message_pages(view.message);
+            if(view.choices.count && view.page>=pages && view.choice_selected>0) view.choice_selected--;
+            else if(view.page>0) view.page--;
+        }
         else view.selected=(view.selected+3)%4;
     }
     if(rising & ((1<<7)|(1<<5))) {
-        if(view.message[0]) { if(view.page<chromatic_message_pages(view.message)-1) view.page++; }
+        if(view.message[0]) {
+            int pages=chromatic_message_pages(view.message);
+            if(view.choices.count && view.page>=pages) {
+                if(view.choice_selected<view.choices.count-1) view.choice_selected++;
+            } else if(view.page<pages-1 || view.choices.count) view.page++;
+        }
         else view.selected=(view.selected+1)%4;
     }
     xSemaphoreGive(lock);

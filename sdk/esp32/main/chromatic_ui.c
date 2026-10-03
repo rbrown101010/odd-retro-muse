@@ -2,6 +2,7 @@
 #include "chromatic.h"
 #include "pixel_font.h"
 #include <string.h>
+#include <stdio.h>
 
 #define W 160
 #define H 144
@@ -78,7 +79,21 @@ void chromatic_render_rows(uint16_t *pixels, const chromatic_view_t *v,
     box(10,11+bob,3,eye,dark); box(22,11+bob,3,eye,dark);
     box(15,19+bob,5,2,dark); box(6,24,6,2,mint); box(22,24,6,2,mint);
     text(36,16,v->title[0]?v->title:"YOUR POCKET MUSE",ink);
-    if(v->message[0]) paragraph(v->message,v->page,ink);
+    bool options=v->message[0] && v->choices.count>0 && v->page>=chromatic_message_pages(v->message);
+    if(options) {
+        int selected=v->choice_selected;
+        if(selected<0) selected=0;
+        if(selected>=v->choices.count) selected=v->choices.count-1;
+        int first=(selected/5)*5;
+        for(int i=0;i<5 && first+i<v->choices.count && first+i<CHROMATIC_CHOICE_COUNT;i++) {
+            int index=first+i, y=32+i*19;
+            if(index==selected) box(3,y-1,154,19,color(33,75,63));
+            char number[16]; snprintf(number,sizeof(number),"%02d",index+1); text(4,y,number,mint);
+            const char *s=v->choices.items[index]; size_t n=strlen(s); if(n>22)n=22;
+            char line[23]; memcpy(line,s,n);line[n]=0;text(22,y,line,ink);
+            if(strlen(s)>22) text(22,y+9,s+22,ink);
+        }
+    } else if(v->message[0]) paragraph(v->message,v->page,ink);
     else {
         const char *items[]={"QUICK CHECK-IN", "NEXT BEST ACTION", "CREATIVE SPARK", "SURPRISE ME"};
         for(int i=0;i<4;i++) {
@@ -88,5 +103,5 @@ void chromatic_render_rows(uint16_t *pixels, const chromatic_view_t *v,
         }
     }
     box(0,132,W,12,color(19,47,49));
-    text(6,135,v->listening?"A+B: SEND  B: CANCEL":v->mic_ready?"A+B: TALK   A: QUICK":v->message[0]?"UP/DOWN: PAGE  B: BACK":"D-PAD: PICK   A: SEND",mint);
+    text(6,135,v->listening?"A+B: SEND  B: CANCEL":options?"UP/DOWN: PICK  A: SEND":v->message[0] && v->choices.count?"A: 20 OPTIONS  B: HOME":v->mic_ready?"A+B: TALK   A: QUICK":v->message[0]?"UP/DOWN: PAGE  B: BACK":"D-PAD: PICK   A: SEND",mint);
 }

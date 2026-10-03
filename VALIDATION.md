@@ -26,3 +26,14 @@ cc -fsanitize=address,undefined -g -Isdk/esp32/main \
   -o work/render-tests
 work/render-tests
 ```
+
+## Twenty-follow-up update
+
+The follow-up feature is built but has not been installed on the physical handheld: its USB update connection was not attached during development. The currently installed Mac app retains the verified microphone fix.
+
+- Firmware and native Mac app builds pass with the new `display.reply` command and 20-option UI.
+- Sanitizer tests pass for full-frame/striped rendering of the options list, including first/last selection and maximum item lengths.
+- Option tests pass for exact counts, duplicate rejection, ASCII/length constraints, round-trip serialization, and encrypted-packet size bounds.
+- The updated firmware needs an application-only USB flash, a healthy boot capture, and a real Muse-generated reply with 20 options before hardware completion can be claimed.
+
+Do not share compiled handheld firmware: it embeds the owner's Muse SDK token.

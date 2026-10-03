@@ -21,6 +21,19 @@ int main(void) {
         }
         if(memcmp(p,striped,160*144*2)) abort();
     }
+    v.choices.count=20;
+    for(int i=0;i<20;i++) { memset(v.choices.items[i],'A'+i,44);v.choices.items[i][44]=0; }
+    for(int selected=-1;selected<=20;selected++) {
+        v.choice_selected=selected;v.page=chromatic_message_pages(v.message);
+        chromatic_render(p,&v);
+        for(int row=0;row<144;row+=8) {
+            stripe[0]=0x1234;stripe[160*8+1]=0xabcd;
+            chromatic_render_rows(stripe+1,&v,row,8);
+            if(stripe[0]!=0x1234 || stripe[160*8+1]!=0xabcd) abort();
+            memcpy(striped+row*160,stripe+1,160*8*2);
+        }
+        if(memcmp(p,striped,160*144*2)) abort();
+    }
     if(chromatic_message_pages("")!=1 || chromatic_message_pages(NULL)!=1) abort();
     memset(v.message,'X',275);v.message[275]=0;
     if(chromatic_message_pages(v.message)!=1) abort();

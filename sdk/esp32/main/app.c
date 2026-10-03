@@ -1839,11 +1839,18 @@ static cJSON *on_ws_command(
     const char *command, cJSON *params, const char *request_id,
     noise_ctrl_session_generation_t session_generation) {
 #if CONFIG_HOMEHUB_CHROMATIC
-    if (strcmp(command, "display.message") == 0) {
+    if (strcmp(command, "display.message") == 0 || strcmp(command, "display.reply") == 0) {
         const char *text = cJSON_GetStringValue(cJSON_GetObjectItem(params, "text"));
         if (!text || !*text || strlen(text) > CHROMATIC_REPLY_BYTES) return command_error("invalid_params", "text must be 1 to 2400 bytes");
         const char *turn_id = cJSON_GetStringValue(cJSON_GetObjectItem(params, "turn_id"));
-        if (!chromatic_deliver_message(text, turn_id)) return command_error("stale_turn", "Include the current handheld request's turn_id when replying; an expired id cannot replace a newer reply.");
+        chromatic_suggestions_t choices;
+        const char *encoded = cJSON_GetStringValue(cJSON_GetObjectItem(params, "suggestions"));
+        if (!chromatic_suggestions_parse(encoded, &choices)) {
+            if (strcmp(command, "display.reply") == 0 || encoded)
+                return command_error("invalid_params", "suggestions must be a JSON-encoded array string of exactly 20 distinct plain ASCII requests, each 1 to 44 characters.");
+            chromatic_suggestions_default(&choices);
+        }
+        if (!chromatic_deliver_message(text, turn_id, &choices)) return command_error("stale_turn", "Include the current handheld request's turn_id when replying; an expired id cannot replace a newer reply.");
         cJSON *r = cJSON_CreateObject(); cJSON_AddBoolToObject(r, "ok", true); return r;
     }
 #endif

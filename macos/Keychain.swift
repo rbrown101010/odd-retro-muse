@@ -1,8 +1,18 @@
 import Foundation
 import Security
+import LocalAuthentication
 
 enum Keychain {
     static let service = "com.riley.odd-retro-muse.openai"
+    static func exists() -> Bool {
+        let context = LAContext(); context.interactionNotAllowed = true
+        let query: [String: Any] = [kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service, kSecAttrAccount as String: "openai",
+            kSecReturnAttributes as String: true, kSecMatchLimit as String: kSecMatchLimitOne,
+            kSecUseAuthenticationContext as String: context]
+        var item: CFTypeRef?
+        return SecItemCopyMatching(query as CFDictionary, &item) == errSecSuccess
+    }
     static func load() -> String? {
         let query: [String: Any] = [kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service, kSecAttrAccount as String: "openai",

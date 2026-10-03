@@ -4,7 +4,7 @@ Turn a ModRetro Chromatic into a pocket interface for your own Muse. A native Ma
 
 ![Handheld interface preview](preview.png)
 
-The compact 160 × 144 interface keeps the little Muse character and gives replies 11 lines per page. Up/Down scroll through answers up to 2,400 ASCII bytes. The FPGA continues to run the cartridge underneath the custom MCU interface.
+The compact 160 × 144 interface keeps the little Muse character and gives replies 11 lines per page. Up/Down scroll through answers up to 2,400 ASCII bytes. Every delivered answer has 20 selectable next requests beneath it. The FPGA continues to run the cartridge underneath the custom MCU interface.
 
 ## Everyday use
 
@@ -19,6 +19,16 @@ Open **Odd Retro Muse.app** in your user Applications folder. It starts at login
 You can also type in the app and press **Send to Muse**. A alone sends the selected handheld quick prompt; B returns to the prompt list. Press the side **Menu** button to show the Muse screen. Keep a game cartridge inserted for the stock FPGA display path.
 
 Speak near the **Mac microphone**. The Chromatic headphone jack is output only. Your phone can stay closed after pairing. With the wireless bridge configured, USB is only needed for updates or power. The Mac must stay awake and connected to the same home network as the handheld; Muse and transcription require internet access. Closing the app window leaves it running. Choosing Quit stops microphone handling until the app is reopened. macOS login is needed after a computer restart.
+
+## Twenty follow-up options
+
+The gadget advertises a `display.reply` tool to Muse. It delivers the answer and exactly 20 distinct, contextual next requests in one call. Each option fits 44 ASCII characters so the full text is readable on two compact handheld lines. The Mac app lists all 20 below the current reply. Selecting one sends that request to Muse; it does not execute when the list appears.
+
+On the handheld, press **A** while reading a reply to open its options, or press Down past the last page. Up/Down selects among all 20 numbered requests; **A** sends the selected one and **B** returns home. Up from the first option returns to the answer. **A+B** keeps its microphone controls.
+
+The legacy `display.message` command still works and supplies 20 general follow-ups if Muse sends only text. New requests explicitly ask Muse to use `display.reply` and generate useful options for the specific answer. Both answer and options carry the current turn ID so a stale result cannot replace a newer turn. Invalid option counts, duplicates, overlong strings, or non-ASCII choices receive a tool error for correction.
+
+This feature requires the updated handheld firmware and companion app. See VALIDATION.md for deployment status.
 
 ## Native Mac installation
 

@@ -11,7 +11,14 @@ void chromatic_message(const char *text);
 void chromatic_chat_init(void);
 bool chromatic_ask(const char *text);
 bool chromatic_chat_busy(void);
-bool chromatic_deliver_message(const char *text, const char *turn_id);
+#define CHROMATIC_CHOICE_COUNT 20
+#define CHROMATIC_CHOICE_BYTES 44
+typedef struct { int count; char items[CHROMATIC_CHOICE_COUNT][CHROMATIC_CHOICE_BYTES+1]; } chromatic_suggestions_t;
+void chromatic_suggestions_default(chromatic_suggestions_t *out);
+bool chromatic_suggestions_parse(const char *encoded, chromatic_suggestions_t *out);
+char *chromatic_suggestions_json(const chromatic_suggestions_t *choices);
+void chromatic_reply(const char *text, const chromatic_suggestions_t *choices);
+bool chromatic_deliver_message(const char *text, const char *turn_id, const chromatic_suggestions_t *choices);
 void chromatic_emit(const char *kind, const char *text);
 void chromatic_set_voice(const char *state);
 void chromatic_wireless_init(void);
@@ -27,7 +34,8 @@ int chromatic_message_pages(const char *text);
 
 /* Portable renderer also used by the host preview. */
 typedef struct {
-    int state, selected, frame, page;
+    int state, selected, frame, page, choice_selected;
+    chromatic_suggestions_t choices;
     bool busy, mic_ready, listening;
     char title[27];
     char message[CHROMATIC_REPLY_BYTES+1];

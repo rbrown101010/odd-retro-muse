@@ -9,6 +9,7 @@ import AppKit
     @Published var state = "ready"
     @Published var draft = ""
     @Published var reply = ""
+    @Published var suggestions: [String] = []
     @Published var message = "Connecting to your Chromatic…"
     @Published var error = ""
     @Published var keyConfigured = false
@@ -40,7 +41,7 @@ import AppKit
     private let autoMic = "automaticMicrophone"
 
     init() {
-        keyConfigured = Keychain.load() != nil
+        keyConfigured = Keychain.exists()
         let saved = UInt32(UserDefaults.standard.integer(forKey: "microphoneDevice"))
         microphoneID = microphones.first(where: { $0.id == saved })?.id
             ?? microphones.first(where: { $0.builtIn })?.id ?? 0
@@ -136,9 +137,13 @@ import AppKit
                 switch event.type {
                 case "voice_toggle": if armed { toggleRecording() }
                 case "voice_cancel": if armed { cancelRecording() }
-                case "busy": museBusy = true; message = "Muse is thinking…"
+                case "busy": suggestions = []; museBusy = true; message = "Muse is thinking…"
                 case "sent": message = "Muse received your question. Waiting for the reply…"
-                case "reply", "push": reply = event.text; museBusy = false; message = "Muse replied. Read it here or on your Chromatic."
+                case "reply", "push": suggestions = []; reply = event.text; museBusy = false; message = "Muse replied. Read it here or on your Chromatic."
+                case "suggestions":
+                    if let rows = try? JSONDecoder().decode([String].self, from: Data(event.text.utf8)), rows.count == 20 {
+                        suggestions = rows
+                    }
                 case "error": error = event.text; museBusy = false
                 default: break
                 }
@@ -211,7 +216,9 @@ import AppKit
                 if self.generation == gen { self.audioURL = nil; self.state = "ready"; self.feedback("ready") }
             }
             do {
-                guard let key = Keychain.load() else { throw AppError("Add your OpenAI API key in Settings.") }
+                let loaded = await Task.detached { Keychain.load() }.value
+                guard self.generation == gen, !Task.isCancelled else { return }
+                guard let key = loaded else { throw AppError("Allow the app to use your saved OpenAI key, or add a key in Settings.") }
                 let text = try await Transcription.transcribe(Data(contentsOf: url), key: key)
                 guard self.generation == gen, !Task.isCancelled else { return }
                 self.draft = text
@@ -234,6 +241,11 @@ import AppKit
         generation += 1; processing?.cancel(); processing = nil; removeRecording(); elapsed = 0
         if state != "ready" { message = "Recording cancelled." }
         state = "ready"; feedback("ready")
+    }
+    func sendSuggestion(_ text: String) async {
+        guard suggestions.contains(text), state == "ready", !museBusy else { return }
+        draft = text
+        await sendDraft()
     }
     func sendDraft() async {
         guard state == "ready", !museBusy else { return }

@@ -1243,6 +1243,12 @@ static char *build_register_json(void) {
     cJSON *optional = cJSON_CreateObject();
     cJSON_AddItemToObject(optional, "turn_id", string_param("When answering a handheld request, copy its provided turn_id exactly. Omit for an unsolicited screen message."));
     add_command(commands, "display.message", "Deliver a reply or message to the Chromatic screen. Include the provided turn_id when answering a handheld request. The user can page through it using the D-pad.", required, optional);
+    required = cJSON_CreateObject();
+    cJSON_AddItemToObject(required, "text", string_param("Complete plain ASCII answer, 1 to 2400 bytes; the screen supports multiple pages."));
+    cJSON_AddItemToObject(required, "suggestions", string_param("A JSON-encoded array string of exactly 20 distinct follow-up questions or useful actions related to this answer. Each is the user's next request, 1 to 44 plain ASCII characters. Example encoding: [\"Explain the main idea.\",\"Make a checklist.\", ...20 total]."));
+    optional = cJSON_CreateObject();
+    cJSON_AddItemToObject(optional, "turn_id", string_param("Copy the current handheld request's turn_id exactly. Omit only for an unsolicited message."));
+    add_command(commands, "display.reply", "Use this tool for every handheld reply: deliver the complete answer together with 20 useful contextual next requests. Options appear beneath the answer on the Mac and handheld. Selecting one sends that request back to Muse.", required, optional);
 #endif
     add_command(commands, "device.health",
                 "Report basic Link health, including battery level (percent), "

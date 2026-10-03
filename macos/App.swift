@@ -116,6 +116,22 @@ struct CompanionView: View {
                     Text(controller.reply.isEmpty ? "Your Muse's reply will appear here and on the Chromatic." : controller.reply)
                         .font(.system(size: 17)).lineSpacing(5).frame(maxWidth: .infinity, alignment: .leading)
                         .foregroundStyle(controller.reply.isEmpty ? .secondary : .primary).textSelection(.enabled)
+                    if !controller.suggestions.isEmpty {
+                        Divider().padding(.vertical, 12)
+                        Text("WHAT NEXT? · 20 OPTIONS").font(.caption.weight(.semibold)).tracking(1).foregroundStyle(mint)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        LazyVStack(spacing: 7) {
+                            ForEach(Array(controller.suggestions.enumerated()), id: \.offset) { index, suggestion in
+                                Button { Task { await controller.sendSuggestion(suggestion) } } label: {
+                                    HStack(spacing: 12) {
+                                        Text(String(format: "%02d", index+1)).font(.system(.caption, design: .monospaced)).foregroundStyle(mint)
+                                        Text(suggestion).font(.system(size: 15)).frame(maxWidth: .infinity, alignment: .leading)
+                                        Image(systemName: "arrow.up.right").font(.caption).foregroundStyle(.secondary)
+                                    }.padding(12).background(.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 8))
+                                }.buttonStyle(.plain).disabled(!controller.connected || controller.museBusy || controller.state != "ready")
+                            }
+                        }
+                    }
                 }.frame(minHeight: 110, maxHeight: .infinity)
             }.padding(20).background(.white.opacity(0.035), in: RoundedRectangle(cornerRadius: 16))
             HStack(alignment: .top, spacing: 14) {
